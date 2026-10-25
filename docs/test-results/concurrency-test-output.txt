@@ -1,0 +1,19 @@
+=================================================================
+>>> CONCURRENCY / OVERSELLING MEASUREMENT RESULTS <<<
+Command: mvn test -Dtest=InventoryServiceIntegrationTest#testConcurrentOrdersCompetingForStock_PreventsOverselling
+Execution Environment: Spring Boot 3.3.3, EmbeddedKafka, H2 DB, JUnit 5
+Pessimistic Lock Mechanism: @Lock(LockModeType.PESSIMISTIC_WRITE) on ProductRepository.findByIdForUpdate()
+
+MEASURED VALUES:
+- Initial Stock Available: 2
+- Simultaneous Concurrent Threads Fired: 10
+- Confirmed / Reserved Orders: 2
+- Out of Stock Rejections: 8
+- Final Available Stock in Database: 0
+- Final Reserved Stock in Database: 2
+- Overselling Detected: NO (ZERO OVERSELLING)
+- Test Status: PASSED (100%)
+=================================================================
+Surefire XML Log Reference:
+TEST-com.orderinventory.inventory.integration.InventoryServiceIntegrationTest.xml
+Time Elapsed: 21.46s

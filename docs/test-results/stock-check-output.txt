@@ -1,0 +1,34 @@
+﻿=================================================================
+>>> STOCK CHECK MEASUREMENT REPORT <<<
+Timestamp: 2026-10-25 20:29:21
+Target: API Gateway (http://localhost:8080/api/products) & MySQL Database (inventory_db.products)
+=================================================================
+
+1. REST API GATEWAY (GET /api/products):
+
+id name                          availableQuantity reservedQuantity updatedAt          
+-- ----                          ----------------- ---------------- ---------          
+55 Wireless Mechanical Keyboard                  0                2 2026-10-25T14:58:47
+56 Ergonomic Vertical Mouse                  42908             7092 2026-10-25T14:55:26
+57 4K Ultra HD Gaming Monitor                   10                0 2026-10-25T14:49:55
+58 USB-C Multiport Hub (10-in-1)                 2                0 2026-10-25T14:49:55
+59 Noise Cancelling Headphones                   0                0 2026-10-25T14:49:55
+
+
+
+
+2. DIRECT MYSQL DATABASE (inventory_db.products):
+id	name	available_quantity	reserved_quantity	version	updated_at 55	Wireless Mechanical Keyboard	0	2	3	2026-10-25 14:58:47 56	Ergonomic Vertical Mouse	42908	7092	7151	2026-10-25 14:55:26 57	4K Ultra HD Gaming Monitor	10	0	0	2026-10-25 14:49:55 58	USB-C Multiport Hub (10-in-1)	2	0	0	2026-10-25 14:49:55 59	Noise Cancelling Headphones	0	0	0	2026-10-25 14:49:55
+
+3. SPECIFIC PRODUCT CHECKS:
+- Product #55 (Mechanical Keyboard - Concurrency Test):
+  Available Quantity: 0
+  Reserved Quantity:  2
+  Status: Stock reduced from 2 to 0; 2 reserved for confirmed orders; 0 oversold.
+
+- Product #56 (Ergonomic Mouse - 60s k6 Load Test):
+  Available Quantity: 42908
+  Reserved Quantity:  7092
+  Status: Accommodated high-concurrency load test without exhaustion or negative inventory.
+
+=================================================================

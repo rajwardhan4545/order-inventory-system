@@ -1,0 +1,10 @@
+﻿00-secrets.yaml -> Secret
+01-namespace.yaml -> Namespace
+02-mysql.yaml -> StatefulSet, Service
+03-kafka.yaml -> StatefulSet, Service, StatefulSet, Service
+04-eureka-server.yaml -> Deployment, Service
+05-inventory-service.yaml -> Deployment, Service
+06-order-service.yaml -> Deployment, Service
+07-notification-service.yaml -> Deployment, Service
+08-api-gateway.yaml -> Deployment, Service
+09-frontend.yaml -> Deployment, Service

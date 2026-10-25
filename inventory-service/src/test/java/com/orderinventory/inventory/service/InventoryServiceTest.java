@@ -126,7 +126,7 @@ class InventoryServiceTest {
                 .timestamp(LocalDateTime.now())
                 .build();
 
-        when(productRepository.findById(55L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.findByIdForUpdate(55L)).thenReturn(Optional.of(sampleProduct));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
         doNothing().when(inventoryProducer).publishInventoryUpdated(any(InventoryUpdatedEvent.class));
 
@@ -152,7 +152,7 @@ class InventoryServiceTest {
                 .timestamp(LocalDateTime.now())
                 .build();
 
-        when(productRepository.findById(55L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.findByIdForUpdate(55L)).thenReturn(Optional.of(sampleProduct));
         doNothing().when(inventoryProducer).publishOrderOutOfStock(any(OrderOutOfStockEvent.class));
 
         inventoryService.processOrderPlaced(event);

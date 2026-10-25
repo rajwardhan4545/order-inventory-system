@@ -269,7 +269,67 @@ docker-compose logs -f
 
 ## 🧪 Testing & Verification
 
-### Using VS Code / IntelliJ REST Client (`requests.http`)
+### 1. Concurrency & Anti-Overselling Verification
+To prevent race conditions during concurrent flash sales, `InventoryService` uses pessimistic locking (`@Lock(LockModeType.PESSIMISTIC_WRITE)`) on `ProductRepository.findByIdForUpdate()`.
+
+#### Command:
+```bash
+# Option A: Run unit/integration concurrency suite
+mvn test -Dtest=InventoryServiceIntegrationTest#testConcurrentOrdersCompetingForStock_PreventsOverselling
+
+# Option B: Run live script against API Gateway
+./docs/test-results/concurrency_test.sh
+# or PowerShell:
+./docs/test-results/concurrency_test.ps1
+```
+
+#### Measured Results:
+| Parameter | Measured Value |
+| :--- | :--- |
+| **Initial Stock** | 2 units (Product #55) |
+| **Simultaneous Concurrent Threads** | 10 |
+| **Orders Confirmed** | 2 |
+| **Orders Out-of-Stock** | 8 |
+| **Final Stock in Database** | 0 Available, 2 Reserved |
+| **Overselling Detected** | **NO (0 overselling)** |
+| **Evidence Output** | [`docs/test-results/concurrency-test-output.txt`](docs/test-results/concurrency-test-output.txt) |
+
+---
+
+### 2. High-Concurrency k6 Load Testing (60s Steady Load)
+A continuous 60-second load test with 50 virtual users was executed through the live Spring Cloud API Gateway against `POST /api/orders` with valid JWT authentication.
+
+#### Command:
+```bash
+k6 run --summary-export="docs/test-results/k6-summary.json" docs/test-results/load_test.js
+```
+
+#### Measured Results (Real Values):
+| Metric | Measured Value |
+| :--- | :--- |
+| **Virtual Users (VUs)** | 50 concurrent users |
+| **Duration** | 60 seconds |
+| **Total Requests Executed** | **7,094** requests |
+| **Throughput (Requests / sec)** | **116.83 req/s** (`116.825011/s`) |
+| **Throughput (Requests / min)** | **7,009.50 req/min** (`rps × 60`) |
+| **p95 Latency (`http_req_duration`)** | **1,046.54 ms** (1.046 s) |
+| **p90 Latency** | **686.45 ms** |
+| **Median Latency** | **313.56 ms** |
+| **Failure Rate (`http_req_failed`)** | **0.00%** (0 failed out of 7,094 requests) |
+| **Checks Passing Rate** | **100.00%** (14,184 / 14,184 passed: HTTP 201 + orderId generated) |
+| **Evidence Files** | [`docs/test-results/k6-summary.json`](docs/test-results/k6-summary.json), [`docs/test-results/k6-load-test-output.txt`](docs/test-results/k6-load-test-output.txt) |
+
+---
+
+### 3. Inventory Stock Audit
+After firing over 7,100 orders, inventory levels were queried directly across MySQL and the Gateway:
+- **Product #56 (Ergonomic Mouse)**: Initial stock `50,000` -> `42,908 Available`, `7,092 Reserved` (Total: `50,000`, Version: `7151`).
+- **Product #55 (Mechanical Keyboard)**: Initial stock `2` -> `0 Available`, `2 Reserved` (Total: `2`, Version: `3`).
+- **Audit Evidence File**: [`docs/test-results/stock-check-output.txt`](docs/test-results/stock-check-output.txt)
+
+---
+
+### 4. Using VS Code / IntelliJ REST Client (`requests.http`)
 Open [requests.http](requests.http) to execute complete end-to-end flows directly in your IDE:
 1. Login to obtain JWT
 2. Inspect catalog products
@@ -278,13 +338,26 @@ Open [requests.http](requests.http) to execute complete end-to-end flows directl
 5. Verify order status transition from `PENDING` -> `CONFIRMED`
 6. Verify notification audit logs
 
-### Using Postman
+### 5. Using Postman
 Import [Order_Inventory_Microservices.postman_collection.json](Order_Inventory_Microservices.postman_collection.json) into Postman. The login request automatically captures and sets the `jwt_token` environment variable for subsequent requests.
 
-### Running Automated Unit Tests
+### 6. Automated Unit & Integration Tests
 ```bash
+# Run all unit and integration tests across all microservices
 mvn test
 ```
+
+#### Test Suite Breakdown (22 Automated Tests, 100% Pass)
+- **Order Service** (8 tests):
+  - 5 Mockito unit tests (`OrderServiceTest`): creation, retrieval, 404 validation, cancellation, status updates
+  - 3 `@SpringBootTest` + `@EmbeddedKafka` integration tests (`OrderServiceIntegrationTest`): full Spring context, H2 persistence, Kafka event dispatch
+- **Inventory Service** (11 tests):
+  - 7 Mockito unit tests (`InventoryServiceTest`): catalog fetching, product addition, manual stock updates, stock deduction, out-of-stock rejection
+  - 4 `@SpringBootTest` + `@EmbeddedKafka` integration tests (`InventoryServiceIntegrationTest`): pessimistic locking, stock reservation, event handling
+- **Notification Service** (3 tests):
+  - 3 Mockito unit tests (`NotificationServiceTest`): confirmation logs, out-of-stock alert dispatch, order log retrieval
+
+*Evidence log saved at: [docs/test-results/mvn-test-with-integration-output.txt](docs/test-results/mvn-test-with-integration-output.txt)*
 
 ---
 
