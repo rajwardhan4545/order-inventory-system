@@ -82,6 +82,7 @@ flowchart TD
 | **Inventory Service** | Product catalog, stock tracking, event-driven deduction | `8082` | MySQL (`inventory_db`) |
 | **Notification Service** | Consume events, simulate email/SMS alerts, audit logs | `8083` | MySQL / H2 (`notification_db`) |
 | **Eureka Server** | Service discovery and registration registry | `8761` | In-memory registry |
+| **Redis Cache** | Distributed in-memory product catalog cache | `6379` | In-memory (`allkeys-lru`) |
 | **Apache Kafka** | Distributed pub/sub event broker | `9092`, `29092` | Log segments |
 | **Zookeeper** | Kafka cluster coordination | `2181` | Quorum metadata |
 | **MySQL Database** | Relational multi-schema storage | `3306` | Persistent volume |
@@ -93,6 +94,7 @@ flowchart TD
 
 - **Core Framework**: Java 17, Spring Boot 3.3.3
 - **Cloud & Microservices**: Spring Cloud 2023.0.3 (Spring Cloud Gateway, Netflix Eureka)
+- **In-Memory Caching**: Redis 7, Spring Data Redis (Lettuce), Spring Cache
 - **Messaging & Event Streaming**: Apache Kafka, Spring Kafka
 - **Persistence**: Spring Data JPA, Hibernate, MySQL 8, H2 Database
 - **Security**: Spring Security, JSON Web Tokens (JJWT 0.12.5)
@@ -408,3 +410,7 @@ kubectl get pods -n order-inventory-system
 ### 4. Eventual Consistency vs Two-Phase Commit (2PC)
 - Distributed 2PC transactions cause high latency, locking, and single-points-of-failure across microservices.
 - We utilize the **Choreography-based Saga Pattern** with asynchronous Kafka events. The order begins in `PENDING` and eventually transitions to `CONFIRMED` or `OUT_OF_STOCK`, ensuring high availability and ACID guarantees within each service boundary.
+
+### 5. Redis In-Memory Caching & Eviction Strategy
+- **Catalog Read Acceleration**: Product catalog queries (`GET /api/products` and `GET /api/products/{id}`) utilize the cache-aside pattern with Redis and a configurable 5-minute TTL (`cache.redis.product-catalog-ttl: 300`), serving high-frequency catalog reads in sub-millisecond latency.
+- **Automated Eviction on Mutation**: All stock mutations via REST (`updateStock`, `addProduct`) and asynchronous Kafka Saga event consumers (`OrderPlacedEvent`, `OrderCancelledEvent`) invoke `@CacheEvict(value = "products", key = "#id")` and clear the `'all'` catalog key, eliminating stale inventory reads while maintaining eventual consistency across the cluster.

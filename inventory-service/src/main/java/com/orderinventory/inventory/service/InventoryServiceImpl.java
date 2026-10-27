@@ -13,6 +13,10 @@ import com.orderinventory.inventory.kafka.InventoryProducer;
 import com.orderinventory.inventory.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,8 +34,9 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "products", key = "'all'")
     public List<ProductResponse> getAllProducts() {
-        log.info("Fetching all products from inventory");
+        log.info("Fetching all products from inventory (Cache Miss)");
         return productRepository.findAll()
                 .stream()
                 .map(ProductResponse::fromEntity)
@@ -40,8 +45,9 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "products", key = "#id")
     public ProductResponse getProductById(Long id) {
-        log.info("Fetching product with ID: {}", id);
+        log.info("Fetching product with ID: {} (Cache Miss)", id);
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with id: " + id));
         return ProductResponse.fromEntity(product);
@@ -49,6 +55,11 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "products", key = "'all'")
+    }, put = {
+        @CachePut(value = "products", key = "#result.id")
+    })
     public ProductResponse addProduct(ProductRequest request) {
         log.info("Adding new product: {}", request.getName());
 
@@ -69,6 +80,10 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "products", key = "#id"),
+        @CacheEvict(value = "products", key = "'all'")
+    })
     public ProductResponse updateStock(Long id, StockUpdateRequest request) {
         log.info("Updating stock for product ID: {}", id);
         Product product = productRepository.findById(id)
@@ -86,6 +101,10 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "products", key = "#event.productId"),
+        @CacheEvict(value = "products", key = "'all'")
+    })
     public void processOrderPlaced(OrderPlacedEvent event) {
         log.info("Processing OrderPlacedEvent: orderId={}, productId={}, quantity={}",
                 event.getOrderId(), event.getProductId(), event.getQuantity());
@@ -143,6 +162,10 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "products", key = "#event.productId"),
+        @CacheEvict(value = "products", key = "'all'")
+    })
     public void processOrderCancelled(OrderCancelledEvent event) {
         log.info("Processing OrderCancelledEvent: orderId={}, productId={}, quantity={}",
                 event.getOrderId(), event.getProductId(), event.getQuantity());
