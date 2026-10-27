@@ -14,8 +14,9 @@ A production-ready, event-driven microservices architecture built with **Java 17
 7. [REST API Endpoints & Documentation](#-rest-api-endpoints--documentation)
 8. [Getting Started & Local Setup](#-getting-started--local-setup)
 9. [Testing & Verification](#-testing--verification)
-10. [Kubernetes Deployment Guide](#-kubernetes-deployment-guide)
-11. [Architectural Decisions & Tradeoffs (Interview Talking Points)](#-architectural-decisions--tradeoffs)
+10. [CI/CD Pipeline (GitHub Actions)](#-cicd-pipeline-github-actions)
+11. [Kubernetes Deployment Guide](#-kubernetes-deployment-guide)
+12. [Architectural Decisions & Tradeoffs (Interview Talking Points)](#-architectural-decisions--tradeoffs)
 
 ---
 
@@ -100,6 +101,7 @@ flowchart TD
 - **Security**: Spring Security, JSON Web Tokens (JJWT 0.12.5)
 - **API Documentation**: Springdoc OpenAPI 3 / Swagger UI
 - **Observability**: Spring Boot Actuator (`/actuator/health`, `/actuator/metrics`)
+- **CI/CD & Container Registry**: GitHub Actions, GitHub Container Registry (GHCR), Docker Buildx
 - **DevOps & Containers**: Docker, Docker Compose, Kubernetes manifests
 - **Build Tool**: Apache Maven (Multi-Module Project)
 
@@ -360,6 +362,42 @@ mvn test
   - 3 Mockito unit tests (`NotificationServiceTest`): confirmation logs, out-of-stock alert dispatch, order log retrieval
 
 *Evidence log saved at: [docs/test-results/mvn-test-with-integration-output.txt](docs/test-results/mvn-test-with-integration-output.txt)*
+
+---
+
+## 🔄 CI/CD Pipeline (GitHub Actions)
+
+A multi-stage continuous integration and continuous deployment pipeline is configured via [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+```mermaid
+flowchart LR
+    Push[Push / PR to main] --> Test[Maven Test\n28 Automated Tests]
+    Test --> Package[Maven Package\nBuild 5 Service JARs]
+    Package --> Upload[Upload Artifacts]
+    Upload --> Matrix[Parallel Docker Matrix]
+    subgraph GHCR["GitHub Container Registry (ghcr.io)"]
+        direction TB
+        Matrix --> Img1[eureka-server:latest]
+        Matrix --> Img2[api-gateway:latest]
+        Matrix --> Img3[order-service:latest]
+        Matrix --> Img4[inventory-service:latest]
+        Matrix --> Img5[notification-service:latest]
+        Matrix --> Img6[frontend:latest]
+    end
+```
+
+### Pipeline Workflow Stages
+1. **Trigger**: Executes on every `push` or `pull_request` targeting `main`.
+2. **Test & Package Job**:
+   - Sets up Temurin JDK 17 with Maven dependency caching (`~/.m2`).
+   - Runs the multi-module Maven test suite across all services (Order, Inventory, Notification).
+   - Compiles and packages all microservice JARs (`mvn package -DskipTests`).
+   - Uploads built JAR artifacts for containerization.
+3. **Parallel Docker Matrix Build & Push Job** (executed on push to `main`):
+   - Uses a 6-way build matrix to package and push Docker images concurrently.
+   - Authenticates to **GitHub Container Registry (`ghcr.io`)** using the repository `GITHUB_TOKEN`.
+   - Tags each image with both `:latest` and the unique immutable commit SHA (`:${{ github.sha }}`).
+   - Utilizes GitHub Actions cache (`type=gha`) for fast incremental layer caching.
 
 ---
 
